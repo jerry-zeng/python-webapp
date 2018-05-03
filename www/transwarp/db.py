@@ -1,7 +1,18 @@
 #coding=utf-8
 
 import threading, functools
+import time, uuid, logging
 import mysql.connector
+
+def next_id(t=None):
+    '''
+    Return next id as 50-char string.
+    Args:
+        t: unix timestamp, default to None and using time.time().
+    '''
+    if t is None:
+        t = time.time()
+    return '%015d%s000' % (int(t * 1000), uuid.uuid4().hex)
 
 class DBError(Exception):
     pass
@@ -241,8 +252,10 @@ def delete(table, **kw):
     return _update(sql, *args)
 
 
-if __name__=='__main__':
-    # create_engine('www-data', 'www-data', 'test')
-    # update('drop table if exists user')
-    # update('create table user (ID int primary key, Name text, Email text, Password text, Last_Modified real)')
-    pass
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    create_engine('root', 'root', '127.0.0.1', '3306', 'mytest')
+    update('drop table if exists user')
+    update('create table user (ID int primary key, Name text, Email text, Password text, Last_Modified real)')
+    import doctest
+    doctest.testmod()
