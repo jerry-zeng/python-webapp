@@ -1,7 +1,21 @@
 #coding=utf-8
 
-import config_default
+class Dict(dict):
+    def __init__(self, keys=(), values=(), **kw):
+        super(Dict, self).__init__(**kw)
 
+        for k,v in zip(keys, values):
+            self[k] = v
+
+
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except:
+            return None
+
+    def __setattr__(self, key, value):
+        self[key] = value
 
 def merge(defaults, overrides):
     r = {}
@@ -14,13 +28,33 @@ def merge(defaults, overrides):
         else:
             r[k] = v
 
-configs = config_default.configs
+    return r
 
-try:
-    import config_override
-    configs = merge(configs, config_override.configs)
+def toDict(config):
+    d = Dict()
 
-except ImportError, e:
-    print e
+    for k, v in config.iteritems():
+        if isinstance(v, dict):
+            d[k] = toDict(v)
+        else:
+            d[k] = v
+
+    return d
+
+def load():
+    import config_default
+    configs = config_default.configs
+
+    try:
+        import config_override
+        configs = merge(configs, config_override.configs)
+
+    except ImportError, e:
+        print e
+
+    configs = toDict(configs)
+
+    return configs
 
 
+configs = load()
