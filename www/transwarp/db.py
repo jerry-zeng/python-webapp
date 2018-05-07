@@ -3,6 +3,7 @@
 import threading, functools
 import time, uuid, logging
 import mysql.connector
+from utils import Dict
 
 def next_id(t=None):
     '''
@@ -19,21 +20,6 @@ class DBError(Exception):
 
 class MultiColumnsError(DBError):
     pass
-
-class Dict(dict):
-    def __init__(self, names, values, **kw):
-        super(Dict, self).__init__(**kw)
-        for k, v in zip(names, values):
-            self[k] = v
-
-    def __getattr__(self, key):
-        try:
-            return self[key]
-        except:
-            return None
-
-    def __setattr__(self, key, value):
-        self[key] = value
 
 class _Engine():
     def __init__(self, connect):

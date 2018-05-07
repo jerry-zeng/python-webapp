@@ -1,6 +1,8 @@
 #coding=utf-8
 
 import threading
+from utils import Dict
+
 
 ctx = threading.local()
 
