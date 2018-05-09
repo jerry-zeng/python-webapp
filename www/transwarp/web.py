@@ -279,9 +279,8 @@ class StaticFileRoute(object):
         self.route = re.compile("^/static/(.+)$")
 
     def match(self, url):
-        mt = self.route.match(url)
-        if mt:
-            return mt.groups()
+        if url.startswith('/static/'):
+            return (url[1:],)
         return None
 
     def __call__(self, *args, **kwargs):
