@@ -469,23 +469,87 @@ class Response(object):
                 del self._cookies[key]
 
 #----------------------------------View-----------------------------------
-class TemplateEngine(object):
-    pass
+class Template(object):
+    def __init__(self, template_name, **kw):
+        self.template_name = template_name
+        self.model = Dict(**kw)
 
+class TemplateEngine(object):
+    def __call__(self, path, model):
+        return "<!-- override this method to render template -->"
 
 class Jinja2TemplateEngine(TemplateEngine):
-    pass
+    def __init__(self, temp_dir, **kw):
+        from jinja2 import Environment, FileSystemLoader
+        if not "autoescape" in kw:
+            kw["autoescape"] = True
+
+        self._env = Environment(loader=FileSystemLoader(temp_dir), **kw)
+
+    def add_filter(self, key, fn_filter):
+        self._env.filters[key] = fn_filter
+
+    def __call__(self, path, model):
+        return self._env.get_template(path).render(**model).encode(DEFAULT_ENCODING)
 
 
 def view(path):
-    pass
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kw):
+            r = func(*args, **kw)
+            if isinstance(r, dict):
+                return Template(path, **r)
+            else:
+                raise ValueError('Expect return a dict when using @view() decorator.')
+        return wrapper
+    return decorator
 
 #-------------------------------Interceptor---------------------------------
-def interceptor(pattern):
+
+_REG_INTERCEPTOR_STARTS_WITH = re.compile(r"^([^\*\?]+)\*?$")
+_REG_INTERCEPTOR_ENDS_WITH = re.compile(r"^\*([^\*\?]+)$")
+
+def _build_pattern_fn(pattern):
+    mt = _REG_INTERCEPTOR_STARTS_WITH.match(pattern)
+    if mt:
+        return lambda s: s.startswith(mt.group(1))
+
+    mt = _REG_INTERCEPTOR_ENDS_WITH.match(pattern)
+    if mt:
+        return lambda s: s.endswith(mt.group(1))
+
+    raise ValueError('Invalid pattern definition in interceptor: %s' % pattern)
+
+def interceptor(pattern="/"):
+    def decorator(func):
+        func.__interceptor__ = _build_pattern_fn(pattern)
+        return func
+    return decorator
+
+
+def _build_interceptor_fn(func, next):
+    def decorator():
+        if func.__interceptor__(ctx.request.path_info):
+            return func(next)
+        else:
+            return next()
+    return decorator
+
+def _build_interceptor_chain(last_fn, *interceptors):
+    l = list(interceptors)
+    l.reverse()
+
+    fn = last_fn
+    for f in l:
+        fn = _build_interceptor_fn(f, fn)
+
+    return fn
+
+#--------------------------------WSGI Application-------------------------------------
+
+def _load_module(module_name):
     pass
-
-
-#---------------------------------------------------------------------
 
 class WSGIApplication(object):
     def __init__(self, document_root=None, **kw):
