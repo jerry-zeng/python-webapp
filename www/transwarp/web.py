@@ -2,7 +2,7 @@
 
 import threading
 from utils import Dict, UTC
-import os, sys,  functools
+import os, sys,  functools, types, mimetypes, traceback, logging
 import re, urllib, cgi, datetime
 
 try:
@@ -197,6 +197,102 @@ def _unquote(s, encoding=DEFAULT_ENCODING):
     s = urllib.unquote(s)
     return s.decode(encoding)
 
+
+_REG_ROUTE = re.compile(r"(\:[a-zA-Z_]\w*)")
+
+def _build_regex(path):
+    '''
+    _build_regex('/path/to/:file')
+    _build_regex('/:user/:comments/list')
+    _build_regex(':id-:pid/:w')
+    '''
+    re_list = []
+    var_list = []
+    is_var = False
+
+    re_list.append("^")
+
+    for v in _REG_ROUTE.split(path):
+        if is_var:
+            var_name = v[1:]
+            var_list.append(var_name)
+            re_list.append(r"(?P<%s>[^\/]+)" % var_name)
+        else:
+            s = ""
+            for ch in v:
+                if ch >= '0' and ch <= '9':
+                    s = s + ch
+                elif ch >= 'A' and ch <= 'Z':
+                    s = s + ch
+                elif ch >= 'a' and ch <= 'z':
+                    s = s + ch
+                else:
+                    s = s + "\\" + ch
+            re_list.append(s)
+
+        is_var = not is_var
+
+    re_list.append("$")
+    return ''.join(re_list)
+
+class Route(object):
+    def __init__(self, func):
+        self.path = func.__web_route__
+        self.method = func.__web_method__
+        self.is_static = _REG_ROUTE.search(self.path) is None
+        if not self.is_static:
+            self.route = re.compile(_build_regex(self.path))
+        self.func = func
+
+    def match(self, url):
+        if self.route:
+            mt = self.route.match(url)
+            if mt:
+                return mt.groups()
+
+        return None
+
+    def __call__(self, *args, **kwargs):
+        return self.func(*args)
+
+    def __str__(self):
+        if self.is_static:
+            return "Route(static, %s, path=%s)" % (self.method, self.path)
+        else:
+            return "Route(dynamic, %s, path=%s)" % (self.method, self.path)
+
+    __repr__ = __str__
+
+
+def _static_file_generator(fpath):
+    block_size = 8192
+    with open(fpath, "rb") as f:
+        block = f.read(block_size)
+        while block:
+            yield block
+            block = f.read(block_size)
+
+class StaticFileRoute(object):
+    def __init__(self):
+        self.method = "GET"
+        self.is_static = False
+        self.route = re.compile("^/static/(.+)$")
+
+    def match(self, url):
+        mt = self.route.match(url)
+        if mt:
+            return mt.groups()
+        return None
+
+    def __call__(self, *args, **kwargs):
+        fpath = os.path.join(ctx.application.document_root, args[0])
+        if not os.path.isfile(fpath):
+            raise notFound()
+
+        fext = os.path.splitext(fpath)[1]
+        tm = mimetypes.types_map  # global
+        ctx.response.content_type = tm.get(fext.lower(), 'application/octet-stream')
+        return _static_file_generator(fpath)
 
 
 def get(path):
@@ -560,42 +656,175 @@ def _load_module(module_name):
 
 class WSGIApplication(object):
     def __init__(self, document_root=None, **kw):
-        self._is_running = False
+        self._running = False
         self._document_root = document_root
 
         self._interceptors = []
-        self.template_engine = None
+        self._template_engine = None
 
+        self._get_static_route = {}
+        self._post_static_route = {}
 
+        self._get_dynamic_route = []
+        self._post_dynamic_route = []
 
     def _check_is_running(self):
-        pass
+        if self._running:
+            raise RuntimeError("Cannot modify WSGIApplication when running.")
 
     def add_module(self, mod):
-        pass
+        self._check_is_running()
+
+        m = None
+        if type(mod) == types.ModuleType:
+            m = mod
+        else:
+            m = _load_module(mod)
+
+        for name in dir(m):
+            fn = getattr(m, name)
+            if callable(fn) and hasattr(fn, "__web_route__") and hasattr(fn, "__web_method__"):
+                self.add_url(fn)
 
     def add_url(self, func):
-        pass
+        self._check_is_running()
+        route = Route(func)
+        if route.is_static:
+            if route.method == "POST":
+                self._post_static_route[route.path] = route
+            elif route.method == "GET":
+                self._get_static_route[route.path] = route
+        else:
+            if route.method == "POST":
+                self._post_dynamic_route.append(route)
+            elif route.method == "GET":
+                self._get_dynamic_route.append(route)
 
     def add_interceptor(self, interceptor):
-        pass
+        self._check_is_running()
+        self._interceptors.append(interceptor)
 
     @property
     def template_engine(self):
-        pass
+        return self._template_engine
 
     @template_engine.setter
     def template_engine(self, value):
-        pass
+        self._check_is_running()
+        self._template_engine = value
 
-    def get_wsgi_application(self):
+    def get_wsgi_application(self, debug=False):
+        self._check_is_running()
+
+        if debug:
+            self._get_dynamic_route.append( StaticFileRoute() )
+
+        self._running = True
+
+        _application = Dict(document_root=self._document_root)
+
+
+        def fn_route():
+            request_method = ctx.request.request_method
+            path_info = ctx.request.path_info
+
+            if request_method == "GET":
+                fn = self._get_static_route.get(path_info, None)
+                if fn:
+                    return fn()
+
+                for route in self._get_dynamic_route:
+                    args = route.match(path_info)
+                    if args:
+                        return route(*args)
+
+                raise notFound()
+
+            elif request_method == "POST":
+                fn = self._post_static_route.get(path_info, None)
+                if fn:
+                    return fn()
+
+                for route in self._post_dynamic_route:
+                    args = route.match(path_info)
+                    if args:
+                        return route(*args)
+
+                raise notFound()
+
+            else:
+                raise badRequest()
+
+        fn_exe = _build_interceptor_chain(fn_route, *self._interceptors)
+
+
         def wsgi(env, start_response):
-            pass
+            ctx.application = _application
+            ctx.request = Request(env)
+            ctx.response = Response()
+
+            response = ctx.response
+
+            try:
+                r = fn_exe()
+
+                if isinstance(r, Template):
+                    r = self._template_engine(r.template_name, r.model)
+                if isinstance(r, unicode):
+                    r = r.encode(DEFAULT_ENCODING)
+                if r is None:
+                    r = []
+
+                start_response(response.status, response.headers)
+
+                return r
+
+            except RedirectError, e:
+                response.set_header("Location", e.location)
+                start_response(e.status, e.location)
+                return []
+            except HttpError, e:
+                start_response(e.status, response.headers)
+                return [ '<html><body><h1>', e.status, '</h1></body></html>' ]
+            except Exception, e:
+                logging.exception(e)
+
+                # 500
+                err = internalError()
+                if not debug:
+                    start_response(err.status, err.headers)
+                    return [ '<html><body><h1>', err.status, '</h1></body></html>' ]
+
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                fp = StringIO()
+                traceback.print_exception(exc_type, exc_value, exc_traceback, file=fp)
+                stacks = fp.getvalue()
+                fp.close()
+
+                start_response(err.status, err.headers)
+
+                return [
+                    '<html><body><h1>',
+                    err.status,
+                    r'''</h1><div style="font-family:Monaco, Menlo, Consolas, 'Courier New', monospace;"><pre>''',
+                    stacks.replace('<', '&lt;').replace('>', '&gt;'),
+                    '</pre></div></body></html>']
+
+            finally:
+                del ctx.application
+                del ctx.request
+                del ctx.response
 
         return wsgi
 
     def run(self, host="127.0.0.1", port=9000):
         from wsgiref.simple_server import make_server
-        server = make_server(host, port, self.get_wsgi_application())
+        logging.info('application (%s) will start at %s:%s...' % (self._document_root, host, port))
+        server = make_server(host, port, self.get_wsgi_application(debug=True))
         server.serve_forever()
 
+
+if __name__ == "__main__":
+    sys.path.append(".")
+    import doctest
+    doctest.testmod()
