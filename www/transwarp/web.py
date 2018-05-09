@@ -549,16 +549,35 @@ def _build_interceptor_chain(last_fn, *interceptors):
 #--------------------------------WSGI Application-------------------------------------
 
 def _load_module(module_name):
-    pass
+    last_dot = module_name.rfind(".")
+    if last_dot == -1:
+        return __import__(module_name, globals(), locals())
+
+    fromModule = module_name[:last_dot]
+    importModule = module_name[last_dot+1:]
+    md = __import__(fromModule, globals(), locals(), [importModule])
+    return hasattr(importModule, md)
 
 class WSGIApplication(object):
     def __init__(self, document_root=None, **kw):
+        self._is_running = False
+        self._document_root = document_root
+
+        self._interceptors = []
+        self.template_engine = None
+
+
+
+    def _check_is_running(self):
+        pass
+
+    def add_module(self, mod):
         pass
 
     def add_url(self, func):
         pass
 
-    def add_interceptor(self, func):
+    def add_interceptor(self, interceptor):
         pass
 
     @property
@@ -566,7 +585,7 @@ class WSGIApplication(object):
         pass
 
     @template_engine.setter
-    def template_engine(self):
+    def template_engine(self, value):
         pass
 
     def get_wsgi_application(self):
