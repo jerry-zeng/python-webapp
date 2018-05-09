@@ -823,6 +823,11 @@ class WSGIApplication(object):
         server = make_server(host, port, self.get_wsgi_application(debug=True))
         server.serve_forever()
 
+        self.server = server
+
+    def shutdown(self):
+        if self.server:
+            self.server.shutdown()
 
 if __name__ == "__main__":
     sys.path.append(".")
