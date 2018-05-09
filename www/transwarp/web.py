@@ -1,9 +1,9 @@
 #coding=utf-8
 
 import threading
-from utils import Dict
-import os, sys, time, datetime, functools
-import re, urllib, cgi
+from utils import Dict, UTC
+import os, sys,  functools
+import re, urllib, cgi, datetime
 
 try:
     from cStringIO import StringIO
@@ -12,7 +12,7 @@ except:
 
 ctx = threading.local()
 
-#---------------------------------------------------------------------
+#-----------------------------------Status & Headers & HttpError----------------------------------
 
 # 状态码.
 _RESPONSE_STATUSES = {
@@ -175,7 +175,7 @@ def found(location):
 def seeOther(location):
     return RedirectError(303, location)
 
-#---------------------------------------------------------------------
+#----------------------------------Tool-----------------------------------
 DEFAULT_ENCODING = "utf-8"
 
 def _to_str(s):
@@ -220,8 +220,8 @@ class MultipartFile(object):
         self.filename = _to_unicode(storage.filename)
         self.file = storage.file
 
-
 class Request(object):
+    # 解析environ.
     def __init__(self, environ):
         self._environ = environ
 
@@ -343,21 +343,130 @@ class Request(object):
         d = self._get_cookie()
         return d.get(key.upper(), default)
 
+_UTC_0 = UTC('+00:00')
 
 class Response(object):
-    def set_header(self, key, value):
-        pass
+    def __init__(self):
+        self._status = "200 OK"
+        self._headers = {'CONTENT-TYPE': 'text/html; charset=utf-8'}
 
-    def set_cookie(self, key, value, max_age=None, expires=None, path="/"):
-        pass
+    @property
+    def status_code(self):
+        return int(self._status[:3])
 
     @property
     def status(self):
-        pass
+        return self._status
 
     @status.setter
     def status(self, value):
-        pass
+        if isinstance(value, (int, long)):
+            if value >= 100 and value <= 999:
+                sc = _RESPONSE_STATUSES[value]
+                if sc:
+                    self._status = "%d %s" % (value, sc)
+                else:
+                    self._status = str(value)
+            else:
+                raise ValueError('Bad response code: %s' % value)
+
+        elif isinstance(value, basestring):
+            if isinstance(value, unicode):
+                value = value.encode(DEFAULT_ENCODING)
+
+            if _REG_RESPONSE_STATUSES.match(value):
+                self._status = value
+            else:
+                raise ValueError('Bad response code: %s' % value)
+
+        else:
+            raise ValueError('Bad type of response code: %s' % value)
+
+
+    @property
+    def headers(self):
+        l = [ ( _RESPONSE_HEADERS_DICT.get(k, k), v) for k,v in self._headers.iteritems()]
+        if hasattr(self, "_cookies"):
+            for v in self._cookies.itervalues():
+                l.append( ("Set-Cookie", v) )
+
+        l.append(_HEADER_X_POWERED_BY)
+        return l
+
+    def header(self, key):
+        name = key.upper()
+        if not name in _RESPONSE_HEADERS_DICT:
+            name = key
+        return self._headers.get(name)
+
+    def unset_header(self, key):
+        name = key.upper()
+        if not name in _RESPONSE_HEADERS_DICT:
+            name = key
+        if name in self._headers:
+            del self._headers[name]
+
+    def set_header(self, key, value):
+        name = key.upper()
+        if not name in _RESPONSE_HEADERS_DICT:
+            name = key
+        self._headers[name] = value
+
+    @property
+    def content_type(self):
+        return self.header("CONTENT-TYPE")
+
+    @content_type.setter
+    def content_type(self, value):
+        if value:
+            self.set_header("CONTENT-TYPE", value)
+        else:
+            self.unset_header("CONTENT-TYPE")
+
+    @property
+    def content_length(self):
+        return self.header("CONTENT-LENGTH")
+
+    @content_length.setter
+    def content_length(self, value):
+        self.set_header("CONTENT-LENGTH", str(value))
+
+    def delete_cookie(self, key):
+        self.set_cookie(key, "__deleted__", expires=0)
+
+    def set_cookie(self, key, value, max_age=None, expires=None, path="/", domain=None, secure=False, http_only=True):
+        if not hasattr(self, "_cookies"):
+            self._cookies = {}
+
+        l = [ "%s=%s" % (_quote(key), _quote(value)) ]
+
+        if expires is not None:
+            # TODO: format expires to date time string.
+            if isinstance(expires, (float, int, long)):
+                expStr = datetime.datetime.fromtimestamp(expires, _UTC_0).strftime('%a, %d-%b-%Y %H:%M:%S GMT')
+                l.append("Expires=%s" % expStr)
+            elif isinstance(expires, (datetime.date, datetime.datetime)):
+                expStr = expires.astimezone(_UTC_0).strftime('%a, %d-%b-%Y %H:%M:%S GMT')
+                l.append("Expires=%s" % expStr)
+
+        elif isinstance(max_age, (int, long)):
+            l.append("Max-Age=%d" % max_age)
+
+        l.append('Path=%s' % path)
+
+        if domain:
+            l.append("Domain=%s" % domain)
+        if secure:
+            l.append("Secure")
+        if http_only:
+            l.append("HttpOnly")
+
+        self._cookies[key] = "; ".join(l)
+
+    def unset_cookie(self, key):
+        if hasattr(self, "_cookies"):
+            if key in self._cookies:
+                del self._cookies[key]
 
 #----------------------------------View-----------------------------------
 class TemplateEngine(object):
