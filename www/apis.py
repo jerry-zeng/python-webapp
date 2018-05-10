@@ -12,15 +12,15 @@ class ApiError(StandardError):
         self.message = message
 
 class ApiValueError(ApiError):
-    def __init__(self, field, msg):
+    def __init__(self, field, msg=""):
         super(ApiValueError, self).__init__("value invalid", field, msg)
 
 class ApiResourceNotFoundError(ApiError):
-    def __init__(self, field, msg):
+    def __init__(self, field, msg=""):
         super(ApiValueError, self).__init__("resource not found", field, msg)
 
 class ApiPermissionError(ApiError):
-    def __init__(self, msg):
+    def __init__(self, msg=""):
         super(ApiValueError, self).__init__("permission denied", "permission", msg)
 
 

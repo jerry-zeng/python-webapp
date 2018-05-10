@@ -11,7 +11,7 @@ from datetime import datetime
 from config import configs
 
 document_root = os.path.dirname(os.path.abspath(__file__))
-print"document_root:", document_root
+print "document_root:", document_root
 
 # 初始化数据库.
 db.create_engine(**configs.db)
@@ -41,7 +41,12 @@ wsgi.template_engine = template_engine
 
 # 加载带有@get/@post的URL处理函数
 import urls
+
+wsgi.add_interceptor(urls.user_interceptor)
+wsgi.add_interceptor(urls.manage_interceptor)
+
 wsgi.add_module(urls)
+
 
 # 在9000端口上启动测试服务.
 if __name__ == "__main__":

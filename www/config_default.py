@@ -9,6 +9,7 @@ configs = {
         "database" : "mytest"
     },
     "session" : {
-        "secret" : "WeBaPp"
+        "secret" : "WeBaPp",
+        "name" : "awesession"
     }
 }

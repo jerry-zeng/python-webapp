@@ -326,7 +326,8 @@ class Request(object):
                 return [_to_unicode(i.value) for i in item]
             if item.filename:
                 return MultipartFile(item)
-            return _to_unicode(item)
+
+            return _to_unicode(item.value)
 
         fs = cgi.FieldStorage(fp=self._environ.get("wsgi.input"), environ=self._environ, keep_blank_values=True)
         inputs = dict()
@@ -427,10 +428,10 @@ class Request(object):
 
             cookieStr = self._environ.get("HTTP_COOKIE")
             if cookieStr:
-                for v in cookieStr.splite(";"):
+                for v in cookieStr.split(";"):
                     pos = v.find("=")
                     if pos > 0:
-                        kvs[ v[:pos].strip() ] = _unquote( v[pos+1:] )
+                        kvs[v[:pos].strip()] = _unquote(v[pos + 1:])
 
         return self._cookies
 
@@ -556,7 +557,7 @@ class Response(object):
         if http_only:
             l.append("HttpOnly")
 
-        self._cookies[key] = "; ".join(l)
+        self._cookies[key] = ";".join(l)
 
     def unset_cookie(self, key):
         if hasattr(self, "_cookies"):
@@ -780,7 +781,7 @@ class WSGIApplication(object):
 
             except RedirectError, e:
                 response.set_header("Location", e.location)
-                start_response(e.status, e.location)
+                start_response(e.status, response.headers)
                 return []
             except HttpError, e:
                 start_response(e.status, response.headers)
@@ -818,7 +819,7 @@ class WSGIApplication(object):
 
     def run(self, host="127.0.0.1", port=9000):
         from wsgiref.simple_server import make_server
-        logging.info('application (%s) will start at %s:%s...' % (self._document_root, host, port))
+        logging.info('application (%s) will start at %s:%s' % (self._document_root, host, port))
         server = make_server(host, port, self.get_wsgi_application(debug=True))
         server.serve_forever()
 
