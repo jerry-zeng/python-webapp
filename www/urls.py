@@ -18,7 +18,8 @@ from apis import api, ApiError, ApiValueError
 @get("/")
 def index():
     blogs = Blog.find_all()
-    user = User.find_first("where admin=?", True)
+    # user = User.find_first("where admin=?", True)
+    user = User.find_first("where name=?", "Jerry")
     return dict(blogs=blogs, user=user)
 
 
