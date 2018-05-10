@@ -73,7 +73,37 @@ def _get_blogs_by_page():
     blogs = Blog.find_by("order by created_at desc limit ?,?", page.offset, page.limit)
     return blogs, page
 
+def _get_users_by_page():
+    total = User.count_all()
+    page = Page(total, _get_page_index(), _get_page_size())
+    users = User.find_by("order by created_at desc limit ?,?", page.offset, page.limit)
+    return users, page
+
+def _get_comments_by_page():
+    total = Comment.count_all()
+    page = Page(total, _get_page_index(), _get_page_size())
+    comments = Comment.find_by("order by created_at desc limit ?,?", page.offset, page.limit)
+    return comments, page
+
 #------------------------------Logic------------------------------
+@interceptor("/")
+def user_interceptor(next):
+    #logging.info("try to bind user from session cookies...")
+    user = None
+    cookie = ctx.request.cookies.get(_COOKIE_NAME)
+    if cookie:
+        user = parse_signed_cookie(cookie)
+    ctx.request.user = user
+    return next()
+
+@interceptor("/manage/")
+def manage_interceptor(next):
+    user = ctx.request.user
+    if user:
+        return next()
+    raise seeOther("/signin")
+
+
 @view("blogs.html")
 @get("/")
 def index():
@@ -92,6 +122,27 @@ def get_blog(blog_id):
     comments = Comment.find_by("where blog_id=? order by created_at desc limit 100", blog_id)
     return dict(blog=blog, comments=comments, user=ctx.request.user)
 
+@view("manage_blog_edit.html")
+@get("/manage/blogs/create")
+def manage_blog_create():
+    return dict(id=None, action="/api/blogs", redirect="/manage/blogs", user=ctx.request.user)
+
+@view("manage_blog_edit.html")
+@get("/manage/blogs/edit/:blog_id")
+def manage_blog_edit(blog_id):
+    blog = Blog.get(blog_id)
+    if blog is None:
+        raise notFound()
+    return dict(id=blog.id, title=blog.title, summary=blog.summary, content=blog.content,
+                action="/api/blogs/%s"%blog_id, redirect="/manage/blogs",
+                user=ctx.request.user)
+
+@view("manage_blog_list.html")
+@get("/manage/blogs")
+def manage_blogs():
+    return dict(page_index=_get_page_index(), user=ctx.request.user)
+
+
 @view("signin.html")
 @get("/signin")
 def signin():
@@ -107,31 +158,24 @@ def signout():
     ctx.response.delete_cookie(_COOKIE_NAME)
     raise seeOther("/")
 
-@interceptor("/")
-def user_interceptor(next):
-    #logging.info("try to bind user from session cookies...")
-    user = None
-    cookie = ctx.request.cookies.get(_COOKIE_NAME)
-    if cookie:
-        user = parse_signed_cookie(cookie)
-    ctx.request.user = user
-    return next()
 
-@interceptor("/manage/")
-def manage_interceptor(next):
-    user = ctx.request.user
-    if user:
-        return next()
-    raise seeOther("/signin")
+@get('/manage/')
+def manage_index():
+    raise seeOther('/manage/comments')
 
-@view("manage_blog_edit.html")
-@get("/manage/blogs/create")
-def manage_blog_create():
-    return dict(id=None, action="/api/blogs", redirect="/manage/blogs", user=ctx.request.user)
 
-@view("manage_blog_list.html")
-@get("/manage/blogs")
-def manage_blogs():
+@view("manage_comment_list.html")
+@get("/manage/comments")
+def manage_comments():
+    return dict(page_index=_get_page_index(), user=ctx.request.user)
+
+
+def manage_commet():
+    pass
+
+@view("manage_user_list.html")
+@get("/manage/users")
+def manage_users():
     return dict(page_index=_get_page_index(), user=ctx.request.user)
 
 #------------------------------Api------------------------------
@@ -191,10 +235,11 @@ def api_register_user():
 @api
 @get("/api/users")
 def api_get_users():
-    users = User.find_by("order by created_at desc")
+    users, page = _get_users_by_page()
     for u in users:
         u.password = "******"
-    return dict(users=users)
+    return dict(users=users, page=page)
+
 
 @api
 @post("/api/blogs")
@@ -230,5 +275,44 @@ def api_get_blog(blog_id):
         return blog
     raise ApiResourceNotFoundError("Blog")
 
-def manage_commet():
-    pass
+@api
+@post("/api/blogs/:blog_id")
+def api_update_blog(blog_id):
+    input = ctx.request.input(title="", summary="", content="")
+    title = input.title.strip()
+    summary = input.summary.strip()
+    content = input.content.strip()
+
+    if not title:
+        raise ApiValueError("title", "title can't be empty.")
+    if not summary:
+        raise ApiValueError("summary", "summary can't be empty.")
+    if not content:
+        raise ApiValueError("content", "content can't be empty.")
+
+    blog = Blog.get(blog_id)
+    if blog is None:
+        raise ApiResourceNotFoundError("Blog")
+
+    blog.title = title
+    blog.summary = summary
+    blog.content = content
+    blog.update()
+
+    return blog
+
+@api
+@post("/api/blogs/:blog_id/delete")
+def api_delete_blog(blog_id):
+    blog = Blog.get(blog_id)
+    if blog is None:
+        raise ApiResourceNotFoundError("Blog")
+    blog.delete()
+    return dict(id=blog_id)
+
+
+@api
+@get("/api/comments")
+def api_get_comments():
+    comments, page = _get_comments_by_page()
+    return dict(comments=comments, page=page)
