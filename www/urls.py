@@ -1,10 +1,11 @@
 #coding=utf-8
 
 import os, re, time, base64, hashlib, logging
+import markdown2
 
 from transwarp.web import get, post, view, interceptor, ctx, seeOther, notFound
 from models import User, Blog, Comment
-from apis import api, ApiError, ApiValueError, ApiPermissionError, Page
+from apis import api, ApiError, ApiValueError, ApiPermissionError, ApiResourceNotFoundError, Page
 from config import configs
 
 _COOKIE_NAME = configs.session.name
@@ -80,6 +81,17 @@ def index():
     user = ctx.request.user
     return dict(blogs=blogs, page=page, user=user)
 
+@view("blog_detail.html")
+@get("/blogs/:blog_id")
+def get_blog(blog_id):
+    blog = Blog.get(blog_id)
+    if blog is None:
+        raise notFound()
+
+    blog.html_content = markdown2.markdown(blog.content)
+    comments = Comment.find_by("where blog_id=? order by created_at desc limit 100", blog_id)
+    return dict(blog=blog, comments=comments, user=ctx.request.user)
+
 @view("signin.html")
 @get("/signin")
 def signin():
@@ -112,7 +124,21 @@ def manage_interceptor(next):
         return next()
     raise seeOther("/signin")
 
+@view("manage_blog_edit.html")
+@get("/manage/blogs/create")
+def manage_blog_create():
+    return dict(id=None, action="/api/blogs", redirect="/manage/blogs", user=ctx.request.user)
+
+@view("manage_blog_list.html")
+@get("/manage/blogs")
+def manage_blogs():
+    return dict(page_index=_get_page_index(), user=ctx.request.user)
+
 #------------------------------Api------------------------------
+
+_REG_EMAIL = re.compile(r"^[a-z0-9\.\-\_]+\@[a-z0-9\-\_]+(\.[a-z0-9\-\_]+){1,4}$")
+_REG_MD5 = re.compile(r"^[0-9a-f]{32}$")
+
 
 @api
 @post("/api/authenticate")
@@ -138,9 +164,6 @@ def authenticate():
 
     user.password = "******"
     return user
-
-_REG_EMAIL = re.compile(r"^[a-z0-9\.\-\_]+\@[a-z0-9\-\_]+(\.[a-z0-9\-\_]+){1,4}$")
-_REG_MD5 = re.compile(r"^[0-9a-f]{32}$")
 
 @api
 @post("/api/users")
@@ -173,11 +196,6 @@ def api_get_users():
         u.password = "******"
     return dict(users=users)
 
-@view("manage_blog_edit.html")
-@get("/manage/blogs/create")
-def manage_blog_create():
-    return dict(id=None, action="/api/blogs", redirect="/manage/blogs", user=ctx.request.user)
-
 @api
 @post("/api/blogs")
 def api_create_blog():
@@ -198,19 +216,19 @@ def api_create_blog():
     blog.insert()
     return blog
 
-@view("manage_blog_list.html")
-@get("/manage/blogs")
-def manage_blogs():
-    return dict(page_index=_get_page_index(), user=ctx.request.user)
-
 @api
 @get("/api/blogs")
 def api_get_blogs():
     blogs, page = _get_blogs_by_page()
     return dict(blogs=blogs, page=page)
 
-def api_get_blog():
-    pass
+@api
+@get("/api/blogs/:blog_id")
+def api_get_blog(blog_id):
+    blog = Blog.get(blog_id)
+    if blog:
+        return blog
+    raise ApiResourceNotFoundError("Blog")
 
 def manage_commet():
     pass
