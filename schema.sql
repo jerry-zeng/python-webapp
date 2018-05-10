@@ -16,6 +16,7 @@ create table users (
     `name` varchar(50) not null,
     `image` varchar(500) not null,
     `created_at` real not null,
+    `last_login` real not null,
     unique key `idx_email` (`email`),
     key `idx_created_at` (`created_at`),
     primary key (`id`)
@@ -30,6 +31,7 @@ create table blogs (
     `summary` varchar(200) not null,
     `content` mediumtext not null,
     `created_at` real not null,
+    `latest_reply` real not null,
     key `idx_created_at` (`created_at`),
     primary key (`id`)
 ) engine=innodb default charset=utf8;
@@ -37,6 +39,7 @@ create table blogs (
 create table comments (
     `id` varchar(50) not null,
     `blog_id` varchar(50) not null,
+    `blog_title` varchar(50) not null,
     `user_id` varchar(50) not null,
     `user_name` varchar(50) not null,
     `user_image` varchar(500) not null,

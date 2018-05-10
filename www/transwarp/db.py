@@ -151,7 +151,7 @@ def _select(sql, first, *args):
     global _db_ctx
     cursor = None
     sql = __handle_sql(sql)
-    logging.info('sql: %s, args: %s' % (sql, args))
+    # logging.info('sql: %s, args: %s' % (sql, args))
     try:
         cursor = _db_ctx.cursor()
         cursor.execute(sql, args)
@@ -197,7 +197,7 @@ def _update(sql, *args):
     global _db_ctx
     cursor = None
     sql = __handle_sql(sql)
-    logging.info('sql: %s, args: %s' % (sql, args))
+    # logging.info('sql: %s, args: %s' % (sql, args))
     try:
         cursor = _db_ctx.cursor()
         cursor.execute(sql, args)

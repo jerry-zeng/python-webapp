@@ -79,10 +79,20 @@ def _get_users_by_page():
     users = User.find_by("order by created_at desc limit ?,?", page.offset, page.limit)
     return users, page
 
-def _get_comments_by_page():
+def _get_comments_by_page(blog_id=None):
     total = Comment.count_all()
     page = Page(total, _get_page_index(), _get_page_size())
-    comments = Comment.find_by("order by created_at desc limit ?,?", page.offset, page.limit)
+    comments = None
+    if blog_id:
+        comments = Comment.find_by("where blog_id=? order by created_at desc limit ?,?", blog_id, page.offset, page.limit)
+    else:
+        comments = Comment.find_by("order by created_at desc limit ?,?", page.offset, page.limit)
+
+    for c in comments:
+        blog = Blog.get(c.blog_id)
+        if blog:
+            c.blog_title = blog.title
+
     return comments, page
 
 #------------------------------Logic------------------------------
@@ -161,7 +171,7 @@ def signout():
 
 @get('/manage/')
 def manage_index():
-    raise seeOther('/manage/comments')
+    raise seeOther('/manage/blogs')
 
 
 @view("manage_comment_list.html")
@@ -169,9 +179,6 @@ def manage_index():
 def manage_comments():
     return dict(page_index=_get_page_index(), user=ctx.request.user)
 
-
-def manage_commet():
-    pass
 
 @view("manage_user_list.html")
 @get("/manage/users")
@@ -198,8 +205,11 @@ def authenticate():
     elif user.password != password:
         raise ApiError("auth failed", "password", "Invalid password.")
 
+    user.last_login = time.time()
+    user.update()
+
     # make session cookie:
-    max_age = None
+    max_age = 3600
     if remember == "true" or remember == "True":
         max_age = 7 * 86400
 
@@ -229,6 +239,7 @@ def api_register_user():
         raise ApiError("register failed", "email", "Email is already in use.")
     else:
         user = User(name=name, email=email, password=password, image='http://www.gravatar.com/avatar/%s?d=mm&s=120' % hashlib.md5(email).hexdigest())
+        user.last_login = time.time()
         user.insert()
     return user
 
@@ -265,6 +276,10 @@ def api_create_blog():
 @get("/api/blogs")
 def api_get_blogs():
     blogs, page = _get_blogs_by_page()
+    format = ctx.request.get("format", "")
+    if format == "html":
+        for blog in blogs:
+            blog.content = markdown2.markdown(blog.content)
     return dict(blogs=blogs, page=page)
 
 @api
@@ -312,7 +327,44 @@ def api_delete_blog(blog_id):
 
 
 @api
+@post("/api/blogs/:blog_id/comments")
+def api_create_blog_comment(blog_id):
+    user = ctx.request.user
+    if user is None:
+        raise ApiPermissionError("Need signin.")
+    blog = Blog.get(blog_id)
+    if blog is None:
+        raise ApiResourceNotFoundError("Blog")
+
+    input = ctx.request.input(content="")
+    content = input.content.strip()
+    if not content:
+        raise ApiValueError("content")
+
+    c = Comment(blog_id=blog_id, user_id=user.id, user_name=user.name, user_image=user.image, content=content)
+    c.insert()
+
+    blog.latest_reply = time.time()
+
+    return dict(comment=c)
+
+@api
+@get("/api/blogs/:blog_id/comments")
+def api_get_blog_comments(blog_id):
+    comments, page = _get_comments_by_page(blog_id)
+    return dict(comments=comments, page=page)
+
+@api
 @get("/api/comments")
 def api_get_comments():
     comments, page = _get_comments_by_page()
     return dict(comments=comments, page=page)
+
+@api
+@post("/api/comments/:comment_id/delete")
+def api_delete_comments(comment_id):
+    comment = Comment.get(comment_id)
+    if comment is None:
+        raise ApiResourceNotFoundError("Comment")
+    comment.delete()
+    return dict(id=comment_id)
