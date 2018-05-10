@@ -4,7 +4,7 @@ import os, re, time, base64, hashlib, logging
 
 from transwarp.web import get, post, view, interceptor, ctx, seeOther, notFound
 from models import User, Blog, Comment
-from apis import api, ApiError, ApiValueError, ApiPermissionError
+from apis import api, ApiError, ApiValueError, ApiPermissionError, Page
 from config import configs
 
 _COOKIE_NAME = configs.session.name
@@ -50,13 +50,35 @@ def check_admin():
         return
     raise ApiPermissionError("Only admin can do the action.")
 
+def _get_page_index():
+    page_index = 1
+    try:
+        page_index = int( ctx.request.get("page", "1") )
+    except ValueError:
+        pass
+    return page_index
+
+def _get_page_size():
+    page_size = 10
+    try:
+        page_size = int(ctx.request.get("size", "10"))
+    except ValueError:
+        pass
+    return page_size
+
+def _get_blogs_by_page():
+    total = Blog.count_all()
+    page = Page(total, _get_page_index(), _get_page_size())
+    blogs = Blog.find_by("order by created_at desc limit ?,?", page.offset, page.limit)
+    return blogs, page
+
 #------------------------------Logic------------------------------
 @view("blogs.html")
 @get("/")
 def index():
-    blogs = Blog.find_all()
+    blogs, page = _get_blogs_by_page()
     user = ctx.request.user
-    return dict(blogs=blogs, user=user)
+    return dict(blogs=blogs, page=page, user=user)
 
 @view("signin.html")
 @get("/signin")
@@ -154,7 +176,7 @@ def api_get_users():
 @view("manage_blog_edit.html")
 @get("/manage/blogs/create")
 def manage_blog_create():
-    return dict(id=None, action="/api/blogs", redirect="/", user=ctx.request.user)
+    return dict(id=None, action="/api/blogs", redirect="/manage/blogs", user=ctx.request.user)
 
 @api
 @post("/api/blogs")
@@ -176,8 +198,14 @@ def api_create_blog():
     blog.insert()
     return blog
 
+@view("manage_blog_list.html")
+@get("/manage/blogs")
+def manage_blogs():
+    return dict(page_index=_get_page_index(), user=ctx.request.user)
+
 @api
 @get("/api/blogs")
 def api_get_blogs():
-    blogs = Blog.find_by("order by created_at desc")
-    return dict(blogs=blogs)
+    blogs, page = _get_blogs_by_page()
+    return dict(blogs=blogs, page=page)
+
