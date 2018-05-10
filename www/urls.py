@@ -209,3 +209,8 @@ def api_get_blogs():
     blogs, page = _get_blogs_by_page()
     return dict(blogs=blogs, page=page)
 
+def api_get_blog():
+    pass
+
+def manage_commet():
+    pass
