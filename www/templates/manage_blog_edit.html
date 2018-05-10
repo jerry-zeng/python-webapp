@@ -1,0 +1,73 @@
+{% extends '__base__.html' %}
+
+{% block title %}编辑日志{% endblock %}
+
+{% block beforehead %}
+<script>
+var action = "{{ action }}";
+var redirect = "{{ redirect }}";
+var vm;
+
+$(function () {
+    vm = new Vue({
+        el: '#form-blog',
+        data: {
+            title: '',
+            summary: '',
+            content: ''
+        },
+        methods: {
+            submit: function (event) {
+                event.preventDefault();
+
+                if (! this.title.trim()) {
+                    return showError('请输入标题');
+                }
+                if (! this.summary.trim()) {
+                    return showError('请输入简介');
+                }
+                if (! this.content.trim()) {
+                    return showError('请输入内容');
+                }
+
+                postApi(action, this.$data, function (err, r) {
+                    if (err) {
+                        showError(err);
+                    }
+                    else {
+                        return location.assign(redirect);
+                    }
+                });
+            }
+        }
+
+    });
+
+});
+</script>
+{% endblock %}
+
+{% block content %}
+    <div class="uk-width-1-1">
+        <form id="form-blog" v-on="submit: submit" class="uk-form uk-form-stacked">
+            <div class="uk-form-row">
+                <div class="uk-form-controls">
+                    <input v-model="title" placeholder="请输入标题" class="uk-width-1-1">
+                </div>
+            </div>
+            <div class="uk-form-row">
+                <div class="uk-form-controls">
+                    <textarea v-model="summary" rows="4" placeholder="请输入简介" class="uk-width-1-1"></textarea>
+                </div>
+            </div>
+            <div class="uk-form-row">
+                <div class="uk-form-controls">
+                    <textarea v-model="content" rows="8" placeholder="请输入内容" class="uk-width-1-1"></textarea>
+                </div>
+            </div>
+            <div class="uk-form-row">
+                <button type="submit" class="uk-button uk-button-primary">保存</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

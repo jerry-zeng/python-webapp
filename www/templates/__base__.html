@@ -32,6 +32,7 @@
             <div class="uk-navbar-flip">
                 <ul class="uk-navbar-nav">
                 {% if user %}
+                    <li><a href="/manage/blogs/create"><i class="uk-icon-edit"></i> 写日志</a></li>
                     <li class="uk-parent" data-uk-dropdown>
                         <a href="#0"><i class="uk-icon-user"></i> {{ user.name }}</a>
                         <div class="uk-dropdown uk-dropdown-navbar">

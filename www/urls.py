@@ -4,7 +4,7 @@ import os, re, time, base64, hashlib, logging
 
 from transwarp.web import get, post, view, interceptor, ctx, seeOther, notFound
 from models import User, Blog, Comment
-from apis import api, ApiError, ApiValueError
+from apis import api, ApiError, ApiValueError, ApiPermissionError
 from config import configs
 
 _COOKIE_NAME = configs.session.name
@@ -44,6 +44,12 @@ def parse_signed_cookie(cookie_str):
     except:
         return None
 
+def check_admin():
+    user = ctx.request.user
+    if user and user.admin:
+        return
+    raise ApiPermissionError("Only admin can do the action.")
+
 #------------------------------Logic------------------------------
 @view("blogs.html")
 @get("/")
@@ -80,7 +86,7 @@ def user_interceptor(next):
 @interceptor("/manage/")
 def manage_interceptor(next):
     user = ctx.request.user
-    if user and user.admin:
+    if user:
         return next()
     raise seeOther("/signin")
 
@@ -144,6 +150,31 @@ def api_get_users():
     for u in users:
         u.password = "******"
     return dict(users=users)
+
+@view("manage_blog_edit.html")
+@get("/manage/blogs/create")
+def manage_blog_create():
+    return dict(id=None, action="/api/blogs", redirect="/", user=ctx.request.user)
+
+@api
+@post("/api/blogs")
+def api_create_blog():
+    input = ctx.request.input(title="", summary="", content="")
+    title = input.title.strip()
+    summary = input.summary.strip()
+    content = input.content.strip()
+
+    if not title:
+        raise ApiValueError("title", "title can't be empty.")
+    if not summary:
+        raise ApiValueError("summary", "summary can't be empty.")
+    if not content:
+        raise ApiValueError("content", "content can't be empty.")
+
+    user = ctx.request.user
+    blog = Blog(title=title, summary=summary, content=content, user_id=user.id, user_name=user.name, user_image=user.image)
+    blog.insert()
+    return blog
 
 @api
 @get("/api/blogs")
