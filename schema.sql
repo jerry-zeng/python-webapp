@@ -6,6 +6,7 @@ create database awesome;
 
 use awesome;
 
+--                                                    USER                             PSWD
 grant select, insert, update, delete on awesome.* to 'root'@'localhost' identified by 'root';
 
 create table users (
