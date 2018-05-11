@@ -135,7 +135,9 @@ def get_blog(blog_id):
 @view("manage_blog_edit.html")
 @get("/manage/blogs/create")
 def manage_blog_create():
-    return dict(id=None, action="/api/blogs", redirect="/manage/blogs", user=ctx.request.user)
+    return dict(id=None, title="", summary="", content="",
+                action="/api/blogs", redirect="/manage/blogs",
+                user=ctx.request.user)
 
 @view("manage_blog_edit.html")
 @get("/manage/blogs/edit/:blog_id")
@@ -143,6 +145,7 @@ def manage_blog_edit(blog_id):
     blog = Blog.get(blog_id)
     if blog is None:
         raise notFound()
+
     return dict(id=blog.id, title=blog.title, summary=blog.summary, content=blog.content,
                 action="/api/blogs/%s"%blog_id, redirect="/manage/blogs",
                 user=ctx.request.user)
@@ -184,6 +187,17 @@ def manage_comments():
 @get("/manage/users")
 def manage_users():
     return dict(page_index=_get_page_index(), user=ctx.request.user)
+
+
+@view("user_detail.html")
+@get("/users/:user_id")
+def get_user(user_id):
+    user = User.get(user_id)
+    if user is None:
+        raise notFound()
+    user.password = "******"
+    return dict(look_user=user, user=ctx.request.user)
+
 
 #------------------------------Api------------------------------
 
@@ -251,6 +265,14 @@ def api_get_users():
         u.password = "******"
     return dict(users=users, page=page)
 
+@api
+@get("/api/users/:user_id")
+def api_get_user(user_id):
+    user = User.get(user_id)
+    if user is None:
+        raise ApiResourceNotFoundError("User")
+    user.password = "******"
+    return user
 
 @api
 @post("/api/blogs")

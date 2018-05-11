@@ -1,0 +1,15 @@
+{% extends '__base__.html' %}
+
+{% block title %}{{ look_user.name }}{% endblock %}
+
+
+{% block content %}
+
+    <div class="uk-width-medium-3-4">
+        <h1>用户信息</h1>
+        <p>ID: {{ look_user.id }}</p>
+        <p>名称: {{ look_user.name }}</p>
+        <p>邮箱: {{ look_user.email }}</p>
+        <p>上次登录: {{ look_user.last_login|datetime }}</p>
+    </div>
+{% endblock %}

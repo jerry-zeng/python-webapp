@@ -6,15 +6,16 @@
 <script>
 var action = "{{ action }}";
 var redirect = "{{ redirect }}";
+
 var vm;
 
 $(function () {
     vm = new Vue({
         el: '#form-blog',
         data: {
-            title: '',
-            summary: '',
-            content: ''
+            title: "{{ title }}",
+            summary: "",
+            content: ""
         },
         methods: {
             submit: function (event) {
