@@ -50,6 +50,6 @@ create table comments (
 ) engine=innodb default charset=utf8;
 
 -- email / password:
--- admin@example.com / password
+-- zlfeng_2012@163.com / admin
 
-insert into users (`id`, `email`, `password`, `admin`, `name`, `created_at`) values ('0010018336417540987fff4508f43fbaed718e263442526000', 'admin@example.com', '5f4dcc3b5aa765d61d8327deb882cf99', 1, 'Administrator', 1402909113.628);
+insert into users (`id`, `email`, `password`, `admin`, `name`, `created_at`, `last_login`) values ('10000', 'zlfeng_2012@163.com', '21232f297a57a5a743894a0e4a801fc3', 1, 'Administrator', 1402909113.628, 1402909113);
