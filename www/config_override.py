@@ -2,10 +2,12 @@
 
 configs = {
     "db" : {
+        "user" : "root",
+        "password" : "jiangfeng",
         "host" : "localhost",
         "port" : "3306",
     },
     "session" : {
-        "secret" : "jerry"
+        "secret" : "jiangfeng"
     }
 }
