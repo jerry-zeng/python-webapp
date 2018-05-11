@@ -239,6 +239,36 @@ def delete(table, **kw):
     sql = 'delete from `%s` where %s' % (table, conditions)
     return _update(sql, *args)
 
+@_with_connection
+def addColumn(table, column):
+    r'''
+    alter table TABLE_NAME add COLUMN
+    e.g:
+        COLUMN = name varchar(10) not null
+    '''
+    sql = "alter table %s add %s" % (table, column)
+    return _update(sql)
+
+@_with_connection
+def dropColumn(table, columnName):
+    r'''
+    alter table TABLE_NAME drop COLUMN_NAME
+    e.g:
+        COLUMN_NAME = id
+    '''
+    sql = "alter table %s drop %s" % (table, columnName)
+    return _update(sql)
+
+@_with_connection
+def changeColumn(table, oldColumnName, newColumn):
+    r'''
+    alter table TABLE_NAME change OLD_COLUMN_NAME NEW_COLUMN
+    e.g:
+        OLD_COLUMN_NAME = id
+        NEW_COLUMN = name varchar(10) not null
+    '''
+    sql = "alter table %s change %s %s" % (table, oldColumnName, newColumn)
+    return _update(sql)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
