@@ -86,7 +86,7 @@ def deploy():
 # 回滚.
 def rollback():
     '''
-    rollback to previous version
+    rollback server to previous version
     '''
     with cd(_REMOTE_BASE_DIR):
         r = run("ls -l -p")
