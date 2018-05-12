@@ -7,7 +7,7 @@ create database awesome;
 use awesome;
 
 --                                                    USER                             PSWD
-grant select, insert, update, delete on awesome.* to 'zjf'@'localhost' identified by 'zjf';
+grant select, insert, update, delete on awesome.* to 'root'@'localhost' identified by 'root';
 
 create table user (
     `id` varchar(50) not null,
@@ -53,4 +53,4 @@ create table comment (
 -- email / password:
 -- zlfeng_2012@163.com / admin
 
-insert into users (`id`, `email`, `password`, `admin`, `name`, `image`, `created_at`, `last_login`) values ('10000', 'zlfeng_2012@163.com', '21232f297a57a5a743894a0e4a801fc3', 1, 'Administrator', 'http://www.gravatar.com/avatar/ea1c6edeb3ef3bc5cb046addf54adf2c?d=mm&s=120', 1402909113.628, 1402909113);
+insert into user (`id`, `email`, `password`, `admin`, `name`, `image`, `created_at`, `last_login`) values ('10000', 'zlfeng_2012@163.com', '21232f297a57a5a743894a0e4a801fc3', 1, 'Administrator', 'http://www.gravatar.com/avatar/ea1c6edeb3ef3bc5cb046addf54adf2c?d=mm&s=120', 1402909113.628, 1402909113);
