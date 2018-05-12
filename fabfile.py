@@ -47,7 +47,7 @@ def pack():
 
     # cd to www folder
     with lcd( os.path.join(_current_path(), "www") ):
-        includes = ["static", "templates", "transwarp", "favico.ico", "*.py"]
+        includes = ["static", "templates", "transwarp", "*.ico", "*.py"]
         excludes = ["test", ".*", "*.pyc", "*.pyo"]
 
         cmd = ["tar", "--dereference", "-czvf", "../dist/%s" % _TAR_FILE]
