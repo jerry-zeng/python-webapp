@@ -13,7 +13,7 @@ app_name = "awesome"
 
 env.user = "root"
 env.sudo_user = "root"
-env.host = "139.196.136.157"
+env.hosts = ["139.196.136.157"]
 
 _TAR_FILE = "dist-awesome.tar.gz"
 
