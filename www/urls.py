@@ -1,6 +1,6 @@
 #coding=utf-8
 
-import os, re, time, base64, hashlib, logging
+import os, re, time, base64, hashlib, logging, json
 import markdown2
 
 from transwarp.web import get, post, view, interceptor, ctx, seeOther, notFound
@@ -277,7 +277,7 @@ def api_get_user(user_id):
 @api
 @post("/api/blogs")
 def api_create_blog():
-    input = ctx.request.input(title="", summary="", content="")
+    input = ctx.request.input(title="", summary="", content="", user="")
     title = input.title.strip()
     summary = input.summary.strip()
     content = input.content.strip()
@@ -290,6 +290,14 @@ def api_create_blog():
         raise ApiValueError("content", "content can't be empty.")
 
     user = ctx.request.user
+    if user is None:
+        userInfo = input.user.strip()
+        d = json.loads(userInfo)
+        user = User(**d)
+
+    if user is None or user.id is None:
+        raise ApiPermissionError("Need signin.")
+
     blog = Blog(title=title, summary=summary, content=content, user_id=user.id, user_name=user.name, user_image=user.image)
     blog.insert()
     return blog
@@ -351,14 +359,21 @@ def api_delete_blog(blog_id):
 @api
 @post("/api/blogs/:blog_id/comments")
 def api_create_blog_comment(blog_id):
+    input = ctx.request.input(content="", user="")
+
     user = ctx.request.user
     if user is None:
+        userInfo = input.user.strip()
+        d = json.loads(userInfo)
+        user = User(**d)
+
+    if user is None or user.id is None:
         raise ApiPermissionError("Need signin.")
+
     blog = Blog.get(blog_id)
     if blog is None:
         raise ApiResourceNotFoundError("Blog")
 
-    input = ctx.request.input(content="")
     content = input.content.strip()
     if not content:
         raise ApiValueError("content")
