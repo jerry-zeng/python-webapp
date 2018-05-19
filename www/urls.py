@@ -378,12 +378,12 @@ def api_create_blog_comment(blog_id):
     if not content:
         raise ApiValueError("content")
 
-    c = Comment(blog_id=blog_id, user_id=user.id, user_name=user.name, user_image=user.image, content=content)
-    c.insert()
+    com = Comment(blog_id=blog_id, user_id=user.id, user_name=user.name, user_image=user.image, content=content)
+    com.insert()
 
     blog.latest_reply = time.time()
 
-    return dict(comment=c)
+    return com
 
 @api
 @get("/api/blogs/:blog_id/comments")
